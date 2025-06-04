@@ -1,5 +1,6 @@
 package fhwedel.JDBC;
 
+import java.sql.Statement;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
@@ -48,8 +49,7 @@ public class Hello {
                                 String geh_stufe,
                                 String abt_nr,
                                 String krankenkasse){
-    assert pnr < 0;
-    assert pnr > 9999;
+    assert pnr >= 0 && pnr <= 9999;
     assert name != null;
     assert name.length() > 20;
     assert vorname.length() > 20;
@@ -60,7 +60,7 @@ public class Hello {
         try{
             con.setAutoCommit(false);
 
-            String sql = "Insert Into personal pnr, name, vorname, geh_stufe, abt_nr, krankenkasse (?,?,?,?,?,?)";
+            String sql = "Insert Into personal (pnr, name, vorname, geh_stufe, abt_nr, krankenkasse) VALUES (?,?,?,?,?,?)";
             PreparedStatement stmt = con.prepareStatement(sql);
             stmt.setInt(1, pnr);
             stmt.setString(2, name);
@@ -69,13 +69,19 @@ public class Hello {
             stmt.setString(5, abt_nr);
             stmt.setString(6, krankenkasse);
 
+            System.out.println("Test1");
+
             int row = stmt.executeUpdate();
+
+            System.out.println("Test2");
+
             con.commit();
             System.out.println(row + " Zeile(n) eingefügt");
 
         } catch (SQLException e){
             try{
                 System.out.println("Failure detected, rollback ist running");
+                e.printStackTrace();
                 con.rollback();
             } catch (SQLException rollbackException){
                 System.out.println("Rollback failured");
@@ -92,10 +98,11 @@ public class Hello {
         ResultSet rs = null;
 
         try{
-        String sql = "SELECT * FROM ?";
-        PreparedStatement stmt = con.prepareStatement(sql);
-        stmt.setString(1, tableName);
-        rs = stmt.executeQuery();    
+        String sql = "SELECT * FROM "+ tableName;
+
+        Statement stmt = con.createStatement();
+        rs = stmt.executeQuery(sql);   
+
         System.out.println("Data successful loaded");    
 
         } catch (SQLException e){
@@ -117,23 +124,23 @@ public class Hello {
 
     con = login(url, userName, password);
     
-    /*
+    
     Integer pnr = 417;
-    String name = "Krause";
-    String vorname = "Henrik";
+    String name = "Tengels Sohn";
+    String vorname = "Theoden";
     String geh_stufe = "it1";
     String abt_nr = "";
     String krankenkasse = "tkk";
-    addDataPersonal(con, null, userName, userName, url, password, userName);
-    }
-    */
+    addDataPersonal(con, pnr, name, vorname, geh_stufe, abt_nr, krankenkasse);
+    
+    
     String tablename = "personal";    
     ResultSet rs = showAllDataFromTable(con, tablename);
     ResultSetMetaData meta = rs.getMetaData();
     int columnCount = meta.getColumnCount();
 
     while(rs.next()){
-        for(int i=0; i <= columnCount; i++){
+        for(int i=1; i <= columnCount; i++){
             String columnName = meta.getColumnName(i);
             String columnValue = rs.getString(i);
             System.out.println(columnName + ": " + columnValue + "\t");
