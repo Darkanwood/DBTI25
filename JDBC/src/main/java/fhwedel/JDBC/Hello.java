@@ -90,7 +90,12 @@ public class Hello {
         }
     }
 
-
+    /**
+     * 
+     * @param con
+     * @param tableName
+     * @return
+     */
     public static ResultSet showAllDataFromTable(Connection con, String tableName){
         assert con != null;
         assert tableName != null;
@@ -112,6 +117,11 @@ public class Hello {
 
 
         return rs;
+    }
+
+
+    public static void riceSalaryPerPercent(Connection con, Integer growthFactor, String geh_stufe){
+        
     }
 
 
