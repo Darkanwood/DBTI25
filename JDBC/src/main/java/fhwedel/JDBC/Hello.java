@@ -48,7 +48,7 @@ public class Hello {
                                 String geh_stufe,
                                 String abt_nr,
                                 String krankenkasse){
-    assert pnr < 0:;
+    assert pnr < 0;
     assert pnr > 9999;
     assert name != null;
     assert name.length() > 20;
@@ -96,7 +96,7 @@ public class Hello {
         PreparedStatement stmt = con.prepareStatement(sql);
         stmt.setString(1, tableName);
         rs = stmt.executeQuery();    
-        System.out.println("Data successful loaded")    
+        System.out.println("Data successful loaded");    
 
         } catch (SQLException e){
             System.out.println("Loading failed");
@@ -117,7 +117,6 @@ public class Hello {
 
     con = login(url, userName, password);
     
-
     /*
     Integer pnr = 417;
     String name = "Krause";
