@@ -1,161 +1,320 @@
 package fhwedel.JDBC;
 
-import java.sql.Statement;
-import java.sql.Connection;
-import java.sql.DriverManager;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.ResultSetMetaData;
-import java.sql.SQLException;
+import java.sql.*;
+import java.util.ArrayList;
+import java.util.List;
 
 public class Hello {
 
-    /**
-     * Stellt Verbindung zum laufenden MariaDB-datenserver her
-     * @return Laufende Connection mit gegebener url
-     */
-    public static Connection login(String url, String userName, String password){
-        assert url != null;
-        assert userName != null;
-        assert password != null;
-        
-        Connection con = null;
 
-        try{
-            con = DriverManager.getConnection(url, userName, password);
-            System.out.println("Connectin Established successfully");
-        } catch (SQLException e){
-            System.out.println("Connection Failed");
-            e.printStackTrace();
+    /**
+     * Stellt eine Verbindung zu einer Datenbank her
+     * @param url die URL der Datenbank
+     * @param userName Der Benutzername für die Anmeldung an der Dantenbanke
+     * @param password das Passwort für die Anmeldung an der Datenbank
+     * @return Ein Connection-Objekt, das die aktivie Verbindung zur Datenbank darstellt
+     * @throws RuntimeException wenn eine SQLException beim Verbindungsaufbau auftritt
+     */
+    public static Connection login(String url, String userName, String password) {
+        try {
+            Connection con = DriverManager.getConnection(url, userName, password);
+            System.out.println("Connection established.");
+            return con;
+        } catch (SQLException e) {
+            System.out.println("Connection failed");
+            throw new RuntimeException(e);
+        }
+    }
+
+
+    /**
+     * Fügt einen neuen Datensatz in die Tabelle ein oder aktualisiert diese falls
+     * bereits ein Eintrag mit derselben pnr existiert
+     * @param con Eine offene COnnection zur Datenbank
+     * @param pnr Personalnummer (Primärschlüssel)
+     * @param name Name der Person
+     * @param vorname Vorname der Person
+     * @param geh_stufe Gehaltsstufe
+     * @param abt_nr Abteilungsnummer
+     * @param krankenkasse Krankenkassenkürzel
+     * @return Anzahl der betroffenen Zeilen
+     * @throws RuntimeException wenn ein SQLException wärend der Ausführung auftritt
+     * @throws IllegalArgumentException wenn ein Parameter die Längenbeschränkung verletzt oder name null ist
+     */
+    public static int addDataPersonal(Connection con, int pnr, String name, String vorname,
+                                      String geh_stufe, String abt_nr, String krankenkasse) {
+        if (name == null || name.length() > 20){
+            throw new IllegalArgumentException("name zu lang");
         }
 
-        return con;
+        if (vorname != null && vorname.length() > 20){
+            throw new IllegalArgumentException("vorname zu lang");
+        }
+
+        if (geh_stufe != null && geh_stufe.length() > 4){
+            throw new IllegalArgumentException("geh_stufe zu lang");
+        }
+
+        if (abt_nr != null && abt_nr.length() > 3){
+            throw new IllegalArgumentException("abt_nr zu lang");
+        }
+
+        if (krankenkasse != null && krankenkasse.length() > 3){
+            throw new IllegalArgumentException("krankenkasse zu lang");
+        }
+
+        String sql =
+                "INSERT INTO personal (pnr, name, vorname, geh_stufe, abt_nr, krankenkasse) " +
+                        "VALUES (?,?,?,?,?,?) " +
+                        "ON DUPLICATE KEY UPDATE name=VALUES(name), vorname=VALUES(vorname), " +
+                        "geh_stufe=VALUES(geh_stufe), abt_nr=VALUES(abt_nr), krankenkasse=VALUES(krankenkasse)";
+
+        try (PreparedStatement ps = con.prepareStatement(sql)) {
+            ps.setInt(1, pnr);
+            ps.setString(2, name);
+            ps.setString(3, vorname);
+            ps.setString(4, geh_stufe);
+            ps.setString(5, abt_nr);
+            ps.setString(6, krankenkasse);
+
+            return ps.executeUpdate();
+
+        } catch (SQLException e) {
+            throw new RuntimeException("INSERT/UPDATE personal fehlgeschlagen", e);
+        }
     }
-    
+
+
     /**
-     * Fügt einen neuen Datensatz in die Tabelle personal ein
-     * @param con Bestehende Verbindung zur Datenbank
-     * @param pnr Personalnummer
-     * @param name Nachnahme
-     * @param vorname Vorname
-     * @param geh_stufe Gehaltstuffe
-     * @param abt_nr Abteilungsnummer
-     * @param krankenkasse Krankenkasse
+     * Select Abfrage auf der angegebenen Tabelle aus und gibt alle Datensätze
+     * Zeilenweise in der Konsole aus
+     * @param con Offene Connection zur Datenbank
+     * @param tableName Name der Tabelle, deren Inhalt angezeigt werden soll
+     * @throws RuntimeException wenn ein SQLException wärend der Ausführung auftritt
      */
-    public static void addDataPersonal(Connection con,
-                                Integer pnr,
-                                String name,
-                                String vorname,
-                                String geh_stufe,
-                                String abt_nr,
-                                String krankenkasse){
-    assert pnr >= 0 && pnr <= 9999;
-    assert name != null;
-    assert name.length() > 20;
-    assert vorname.length() > 20;
-    assert geh_stufe.length() > 4;
-    assert abt_nr.length() > 3;
-    assert krankenkasse.length() > 3;
-    
-        try{
+    public static void showAll(Connection con, String tableName) {
+        String sql = "SELECT * FROM " + tableName;
+
+        try (Statement st = con.createStatement();
+             ResultSet rs = st.executeQuery(sql)) {
+            ResultSetMetaData m = rs.getMetaData();
+            int c = m.getColumnCount();
+
+            while (rs.next()) {
+
+                StringBuilder row = new StringBuilder();
+
+                for (int i = 1; i <= c; i++) {
+                    row.append(m.getColumnLabel(i)).append(": ").append(rs.getString(i));
+                    if (i < c) row.append(" | ");
+                }
+                //Teststelle
+                System.out.println(row);
+            }
+
+        } catch (SQLException e) {
+            throw new RuntimeException("SELECT * FROM " + tableName + " fehlgeschlagen", e);
+        }
+    }
+
+
+    /**
+     * Erhöht den Betrag aller Gehälter einer bestimmten Gehaltsstufe prozentual
+     * @param con Offene Connection zur Datenbank
+     * @param percent Prozentuale Erhöhrung
+     * @param gehStufe Gehaltsstufe, die angepasst werden soll
+     * @return Die Anzahl der betroffenen Datensätze
+     * @throws RuntimeException wenn ein SQLException wärend der Ausführung auftritt
+     */
+    public static int raiseSalaryPercent(Connection con, int percent, String gehStufe) {
+        String sql = "UPDATE gehalt SET betrag = ROUND(betrag * (1 + ?/100.0), 0) WHERE geh_stufe = ?";
+
+        try (PreparedStatement ps = con.prepareStatement(sql)) {
+            ps.setInt(1, percent);
+            ps.setString(2, gehStufe);
+
+            return ps.executeUpdate();
+
+        } catch (SQLException e) {
+            throw new RuntimeException("UPDATE gehalt fehlgeschlagen", e);
+        }
+    }
+
+
+    /**
+     * Löscht alle Datensätze aus der Tabelle personal, deren
+     * Name exakt dem angegebenen namen entpsricht
+     * @param con Offene Connection zur Datenbank
+     * @param name Nachmane der zu löschenden Mitarbeiter
+     * @return die Anzahl der gelöschten Datensätze
+     * @throws RuntimeException wenn ein SQLException wärend der Ausführung auftritt
+     */
+    public static int deletePersonalByName(Connection con, String name) {
+        String sql = "DELETE FROM personal WHERE name = ?";
+
+        try (PreparedStatement ps = con.prepareStatement(sql)) {
+            ps.setString(1, name);
+
+            return ps.executeUpdate();
+
+        } catch (SQLException e) {
+            throw new RuntimeException("DELETE personal fehlgeschlagen", e);
+        }
+    }
+
+
+    /**
+     * Ruft alle Mitarbeiter aus der Abteilung Verkauf ab
+     * @param con Offene Connection zur Datenbank
+     * @return Liste der Mitarbeiter in der Abteilung Verkauf; leere liste, weknn keine gefunden werden
+     * @throws RuntimeExcewption wenn ein SQLException während der Abfrage auftritt
+     */
+    public static List<String> employeesInVerkauf(Connection con) {
+        String sql =
+                "SELECT p.pnr, p.name, p.vorname " +
+                        "FROM personal p " +
+                        "JOIN abteilung a ON a.abt_nr = p.abt_nr " +
+                        "WHERE TRIM(a.name) = 'Verkauf'";
+
+        List<String> result = new ArrayList<>();
+
+        try (Statement st = con.createStatement();
+             ResultSet rs = st.executeQuery(sql)) {
+
+            while (rs.next()) {
+                result.add(rs.getInt(1) + " - " + rs.getString(2) + ", " + rs.getString(3));
+            }
+
+            return result;
+
+        } catch (SQLException e) {
+            throw new RuntimeException("Abfrage Verkauf fehlgeschlagen", e);
+        }
+    }
+
+    // 7) Migration: Krankenkasse-Kürzel -> separate Tabelle + FK
+    /**
+     * Migriert die Krankenkassen-Inforamtionen in eineeigene Tabelle krankenversicherung
+     * und ersetzt die bisherigen Kürzel personal durch Fremdschlüsselreferenzen.
+     * @param con Offene Connection zur Datenbank
+     */
+    public static void migrateKrankenkasse(Connection con) {
+        try {
             con.setAutoCommit(false);
 
-            String sql = "Insert Into personal (pnr, name, vorname, geh_stufe, abt_nr, krankenkasse) VALUES (?,?,?,?,?,?)";
-            PreparedStatement stmt = con.prepareStatement(sql);
-            stmt.setInt(1, pnr);
-            stmt.setString(2, name);
-            stmt.setString(3, vorname);
-            stmt.setString(4, geh_stufe);
-            stmt.setString(5, abt_nr);
-            stmt.setString(6, krankenkasse);
+            // neue Tabellen anlegen
+            try (Statement st = con.createStatement()) {
+                st.execute(
+                        "CREATE TABLE IF NOT EXISTS krankenversicherung(" +
+                                "  kkid INT PRIMARY KEY," +
+                                "  kuerzel CHAR(3) UNIQUE NOT NULL," +
+                                "  name VARCHAR(100) NOT NULL" +
+                                ")");
 
-            System.out.println("Test1");
+                st.execute(
+                        "CREATE TABLE IF NOT EXISTS personal_neu(" +
+                                "  pnr INT PRIMARY KEY," +
+                                "  name CHAR(20) NOT NULL," +
+                                "  vorname CHAR(20)," +
+                                "  geh_stufe VARCHAR(4)," +
+                                "  abt_nr CHAR(3)," +
+                                "  kkid INT," +
+                                "  CONSTRAINT fk_geh FOREIGN KEY (geh_stufe) REFERENCES gehalt(geh_stufe)," +
+                                "  CONSTRAINT fk_abt FOREIGN KEY (abt_nr) REFERENCES abteilung(abt_nr)," +
+                                "  CONSTRAINT fk_kk  FOREIGN KEY (kkid) REFERENCES krankenversicherung(kkid)" +
+                                ")"
+                );
+            }
 
-            int row = stmt.executeUpdate();
+            // Stammdaten in krankenversicherung einfügen
+            try (PreparedStatement ps = con.prepareStatement(
+                    "INSERT INTO krankenversicherung(kkid, kuerzel, name) VALUES (?,?,?) " +
+                            "ON DUPLICATE KEY UPDATE name=VALUES(name)")) {
+                Object[][] data = {
+                        {1,"aok","Allgemeine Ortskrankenkasse"},
+                        {2,"bak","Betriebskrankenkasse B. Braun Aesculap"},
+                        {3,"bek","Barmer Ersatzkasse"},
+                        {4,"dak","Deutsche Angestelltenkrankenkasse"},
+                        {5,"tkk","Techniker Krankenkasse"},
+                        {6,"kkh","Kaufmännische Krankenkasse"}
+                };
+                for (Object[] r : data) {
+                    ps.setInt(1,(int) r[0]);
+                    ps.setString(2,(String) r[1]);
+                    ps.setString(3,(String) r[2]);
+                    ps.addBatch();
+                }
+                ps.executeBatch();
+            }
 
-            System.out.println("Test2");
+            // Daten migrieren (Kürzel -> kkid)
+            try (Statement st = con.createStatement()) {
+                st.execute(
+                        "INSERT INTO personal_neu(pnr,name,vorname,geh_stufe,abt_nr,kkid) " +
+                                "SELECT pnr, name, vorname, geh_stufe, abt_nr, kv.kkid " +
+                                "FROM personal p LEFT JOIN krankenversicherung kv ON kv.kuerzel = p.krankenkasse");
+            }
+
+            // Swap
+            try (Statement st = con.createStatement()) {
+                st.execute("RENAME TABLE personal TO personal_alt, personal_neu TO personal");
+            }
+
+            // Aufräumen
+            try (Statement st = con.createStatement()) {
+                st.execute("DROP TABLE personal_alt");
+            }
 
             con.commit();
-            System.out.println(row + " Zeile(n) eingefügt");
+            con.setAutoCommit(true);
 
-        } catch (SQLException e){
-            try{
-                System.out.println("Failure detected, rollback ist running");
-                e.printStackTrace();
-                con.rollback();
-            } catch (SQLException rollbackException){
-                System.out.println("Rollback failured");
-                rollbackException.printStackTrace();
-            }
+            //Testausgabe
+            System.out.println("Migration erfolgreich abgeschlossen.");
+
+        } catch (SQLException e) {
+            try { con.rollback(); } catch (SQLException ignored) {}
+            throw new RuntimeException("Migration fehlgeschlagen", e);
         }
     }
 
-    /**
-     * 
-     * @param con
-     * @param tableName
-     * @return
-     */
-    public static ResultSet showAllDataFromTable(Connection con, String tableName){
-        assert con != null;
-        assert tableName != null;
+    public static void main(String[] args) {
+        String url = "jdbc:mariadb://localhost:3306/firma";
+        String user = "root";
+        String pass = "password";
 
-        ResultSet rs = null;
+        //Finale Testausgaben
+        try (Connection con = login(url, user, pass)) {
 
-        try{
-        String sql = "SELECT * FROM "+ tableName;
 
-        Statement stmt = con.createStatement();
-        rs = stmt.executeQuery(sql);   
+            addDataPersonal(con, 417, "Krause", "Henrik", "it1", "d15", "tkk");
 
-        System.out.println("Data successful loaded");    
 
-        } catch (SQLException e){
-            System.out.println("Loading failed");
-            e.getSQLState();
+            System.out.println("== personal (vor Änderungen) ==");
+            showAll(con, "personal");
+
+
+            int upd = raiseSalaryPercent(con, 10, "it1");
+            System.out.println("Gehaltsstufe it1 angepasst: " + upd + " Zeile(n).");
+
+
+            int del = deletePersonalByName(con, "Tietze");
+            System.out.println("Gelöscht: " + del + " Zeile(n) für 'Tietze'.");
+
+            // Abfrage Verkauf
+            System.out.println("MitarbeiterInnen in Abteilung 'Verkauf':");
+            for (String s : employeesInVerkauf(con)) System.out.println("  " + s);
+
+
+            migrateKrankenkasse(con);
+
+
+            System.out.println("== personal (nach Migration) ==");
+            showAll(con, "personal");
+            System.out.println("== krankenversicherung ==");
+            showAll(con, "krankenversicherung");
+
+        } catch (Exception e) {
+            e.printStackTrace();
         }
-
-
-        return rs;
     }
-
-
-    public static void riceSalaryPerPercent(Connection con, Integer growthFactor, String geh_stufe){
-        
-    }
-
-
-
-    public static void main(String[] args) throws SQLException {
-    String url = "jdbc:mariadb://localhost:3306/firma";
-    String password = "password";
-    String userName = "root";
-    Connection con = null;
-
-    con = login(url, userName, password);
-    
-    
-    Integer pnr = 417;
-    String name = "Tengels Sohn";
-    String vorname = "Theoden";
-    String geh_stufe = "it1";
-    String abt_nr = "";
-    String krankenkasse = "tkk";
-    addDataPersonal(con, pnr, name, vorname, geh_stufe, abt_nr, krankenkasse);
-    
-    
-    String tablename = "personal";    
-    ResultSet rs = showAllDataFromTable(con, tablename);
-    ResultSetMetaData meta = rs.getMetaData();
-    int columnCount = meta.getColumnCount();
-
-    while(rs.next()){
-        for(int i=1; i <= columnCount; i++){
-            String columnName = meta.getColumnName(i);
-            String columnValue = rs.getString(i);
-            System.out.println(columnName + ": " + columnValue + "\t");
-        }
-        System.out.println();
-    }
-}
 }
