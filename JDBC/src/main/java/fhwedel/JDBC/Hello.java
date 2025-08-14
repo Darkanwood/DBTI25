@@ -106,7 +106,9 @@ public class Hello {
                 StringBuilder row = new StringBuilder();
                 for (int i = 1; i <= c; i++) {
                     row.append(m.getColumnLabel(i)).append(": ").append(rs.getString(i));
-                    if (i < c) row.append(" | ");
+                    if (i < c){
+                        row.append(" | ");
+                    }
                 }
                 System.out.println(row);
             }

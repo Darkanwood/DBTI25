@@ -114,10 +114,14 @@ public class CRUDclient {
         }
     }
 
-    /**
+
+/**
  * Liest alle Mitarbeiter aus MariaDB und ergänzt pro Mitarbeiter
  * eingebettete Arrays für Kinder, Prämien und Maschinen.
  * Nutzt die migrierte Struktur mit personal.kkid + Tabelle krankenversicherung.
+ * @param maria Offene MariaDB-Verbindung
+ * @param personal Ziel-Collection in MongoDB, in die die importierten Dokumente eingefügt werden
+ * @throws SQLException Bei SQL Fehlern
  */
 private static void importPersonalMitEinbettungen(Connection maria, MongoCollection<Document> personal) throws SQLException {
     String sqlP = 
@@ -127,7 +131,7 @@ private static void importPersonalMitEinbettungen(Connection maria, MongoCollect
     "LEFT JOIN krankenversicherung kv ON kv.kkid = p.kkid";
 
 
-    try (Statement st = maria.createStatement();
+    try (Statement st =  maria.createStatement();
          ResultSet rs = st.executeQuery(sqlP)) {
         int n = 0;
         while (rs.next()) {
