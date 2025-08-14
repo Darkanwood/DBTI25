@@ -1,0 +1,77 @@
+Auf Grundlage der vorhandenen realationalen Tabellenstrukturen der Firma-Datenbank wurde ein
+MongoDB-Datenmodell entworfen, das eine moderate Normalisierung vorsieht. Das Ziel ist, eine klare
+Trennug von Stammdaten und operativen Daten zu erreichen, gleichzeitig aber abhängige 1:n-Daten direkt
+beim jeweiligen Mitarbeiter zu speichern, um später Abfragen ohne komplexe Joins zu ermöglichen.
+
+Im folgenden werden die einzelnen implementierungen beschrieben:
+
+1. Collection abteilung
+Die Collection enthält alle Abteilungen des Unternehemns als Stammdaten. Die Begründung hierfür ist, dass die 
+Abteilungen sich selten ändern und von vielen Mitarbeitern referenziert werden. Eine separate Collection 
+ermöglicht eine zentrale und einheitliche Pflege.
+Die Implementierung würde wie folgt aussehen:
+
+{ "abt_nr": "d15", "name": "Verkauf" }
+
+
+2. Collection gehalt
+Die Collection gehalt speichert die Gehaltsstufe des Unternehmens. Die Begründung hierfür ist, dass auch es
+sich auch hier um Stammdaten handelt, die nicht redundant bei jedem Mitarbeiter gespeichert werden müssen.
+Die Implementierung würde wie folgt aussehen:
+
+{ "geh_stufe": "it1", "betrag": 2523 }
+
+
+3. Collection personal
+Diese Collection enthält alle Mitarbeiterdaten. Abhängige Daten aus den Tabellen kind, praemie und maschine
+werden direkt als eingebettete Arrays gespeichert. Die Begründung ist, dass die Tabelle kind, paemie und
+maschine über eine 1:n Beziehung direkt an personal hängen. Das Einbetten dieser Informationen im
+Mitarbeiter Dokument vermeidet später Join Operationen und sorgt für eine logische Gruppierung der Daten.
+Die Implementierung würde wie folgt aussehen: 
+
+{
+  "pnr": 167,
+  "name": "Krause",
+  "vorname": "Gustav",
+  "geh_stufe": "it3",
+  "abt_nr": "d12",
+  "krankenkasse": "dak",
+  "kinder": [
+    { "k_name": "Krause", "k_vorname": "Fritz", "k_geb": 1997 },
+    { "k_name": "Krause", "k_vorname": "Ida",   "k_geb": 1999 }
+  ],
+  "praemien": [ 550, 610, 250 ],
+  "maschinen": [
+    { "mnr": 1, "name": "Bohrmaschine", "ansch_datum": ISODate("1999-02-01"),
+      "neuwert": 30000, "zeitwert": 15000 }
+  ]
+}
+
+
+Muss die Datenbank in Normalform stehen und müssen alle Zusammenhänge zwischen Entitäten über 
+Fremdschlüsselbeziehungen repräsentiert werden ?
+
+In relationalen Datenbanken ist es üblich, die Daten mindestens bis zur dritten Normalform zu bringen, 
+um Redundanzen zu vermeiden und Datenintegrität über Fremdschlüssel zu sichern.
+
+MongoDB funktioniert jedoch dokumentenorientiert und benötigt keine vollständige Normalisierung wie 
+im relationalen Modell. Daten, die in einer 1:n-Beziehung zu einer Hauptentität stehen, können direkt im 
+gleichen Dokument gespeichert werden.
+
+Für die Firma Datenbank bedeutet das:
+
+1. Keine vollständige Normalisierung notwendig, da Daten, die nur im Kontext einer Hauptintätität
+relevant sind direkt in personal eingebetet werden.
+
+2. Keine erwungene Fremdschlüssel, da MongoDB keine Fremdschlüssel benötigt. Beziehungen zwischen Collections
+bestehen nur logisch, zum Beispiel abt_nr in personal entspricht einem Eintrag in abteilung. Die Konsistenz
+dieser Daten liegt in der Verantwortung der Anwendung.
+
+3. Sinnvolle Trennung von Stammdaten, da Tabellen wie abteilung und gehalt als eigene Collection geführt werden,
+damit diese unabhängig gepflegt und mehrfach genutzt werden können.
+
+
+Zusammengefasst lässt sich sagen, dass eine vollständige Normalform in MongoDB nicht erforderlich ist. Stattdessen
+entscheidet man je nach Zugriffsmustern, Änderungsbedarf und logischer Zugehörigkeit, ob Daten eingebettet oder 
+separat gespeichert werden. So lassen sich die Vorteile von eingebetteten Dokumenten mit einer sauberen Trennung 
+wiederverwendbarer Stammdaten kombinieren.
