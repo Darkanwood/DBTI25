@@ -1,0 +1,71 @@
+#!/bin/sh
+### BEGIN INIT INFO
+# Provides:          mongod
+# Required-Start:    $remote_fs $syslog
+# Required-Stop:     $remote_fs $syslog
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: Start MongoDB daemon
+# Description:       Start the MongoDB 7.0 server daemon using a manual launch.
+### END INIT INFO
+
+DAEMON=/usr/bin/mongod
+PIDFILE=/var/run/mongod.pid
+LOGFILE=/var/log/mongodb/mongod.log
+DBPATH=/var/lib/mongodb
+CONFIGFILE=/etc/mongod.conf
+
+start() {
+    echo "Starting MongoDB..."
+    start-stop-daemon --start --quiet --pidfile "$PIDFILE" \
+        --exec "$DAEMON" -- --config "$CONFIGFILE" --fork --logpath "$LOGFILE" --pidfilepath "$PIDFILE"
+    RETVAL=$?
+    echo
+    return $RETVAL
+}
+
+stop() {
+    echo "Stopping MongoDB..."
+    start-stop-daemon --stop --quiet --pidfile "$PIDFILE" \
+        --retry 10
+    RETVAL=$?
+    echo
+    return $RETVAL
+}
+
+status() {
+    if [ -f "$PIDFILE" ]; then
+        pid=$(cat "$PIDFILE")
+        if ps -p "$pid" > /dev/null 2>&1; then
+            echo "MongoDB is running (pid $pid)"
+            return 0
+        else
+            echo "MongoDB is not running, but pid file exists"
+            return 1
+        fi
+    else
+        echo "MongoDB is not running"
+        return 3
+    fi
+}
+
+case "$1" in
+  start)
+    start
+    ;;
+  stop)
+    stop
+    ;;
+  restart)
+    stop
+    start
+    ;;
+  status)
+    status
+    ;;
+  *)
+    echo "Usage: /etc/init.d/mongod {start|stop|restart|status}"
+    exit 1
+esac
+
+exit 0
